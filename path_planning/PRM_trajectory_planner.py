@@ -4,6 +4,7 @@ import numpy as np
 from scipy.spatial import KDTree
 import random
 import math
+# import dubins
 
 assert rclpy
 from geometry_msgs.msg import PoseWithCovarianceStamped, PoseStamped, PoseArray
@@ -14,6 +15,7 @@ from .utils import LineTrajectory
 from skimage.morphology import disk, dilation 
 
 
+# TODO: Add dubins path planner
 class PathPlan(Node):
     """ Listens for goal pose published by RViz and uses it to plan a path from
     current car pose.
@@ -71,7 +73,7 @@ class PathPlan(Node):
         self.map_resolution = None
         self.map_origin = (0.0, 0.0)
 
-        self.num_samples = 500 #1000 -> 500
+        self.num_samples = 200 #1000 -> 500 -> 300 ->100 // 100 is unstable, 300 is stable
         self.k_neighbors = 10
         self.max_edge_length = 10000.0 # 100
 
@@ -83,6 +85,7 @@ class PathPlan(Node):
         self.map_rotation_inv = np.eye(2)
 
         self.robot_radius_m = 0.25
+        self.turning_radius = 1.0
 
     def map_cb(self, msg):
         self.map_data = np.array(msg.data, dtype=np.int8).reshape(msg.info.height, msg.info.width)
@@ -216,6 +219,9 @@ class PathPlan(Node):
                 if (self.is_path_collision_free(node, self.nodes[idx]) and 
                     distances[j] <= self.max_edge_length):
                     self.edges[i].append(idx)
+                # if (self.dubins_is_path_collision_free(node, self.nodes[idx]) and 
+                #     distances[j] <= self.max_edge_length):
+                #     self.edges[i].append(idx)
         
         self.get_logger().info(f"Edges: {len(self.edges[0])}")
 
@@ -274,6 +280,15 @@ class PathPlan(Node):
             if not self.is_collision_free(point):
                 return False
         return True
+    
+    # def dubins_is_path_collision_free(self, p1, p2):
+    #     path = dubins.shortest_path(p1, p2, self.turning_radius)
+    #     configurations, _ = path.sample_many(0.1)
+
+    #     for (x, y, theta) in configurations:
+    #         if not self.is_collision_free((x, y)):
+    #             return False
+    #     return True
 
     def sample_random_point(self): # TODO: Can be optimized //using world_coordinates
         """Sample a random point in the map"""
