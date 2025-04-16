@@ -8,7 +8,7 @@ from nav_msgs.msg import OccupancyGrid
 from .utils import LineTrajectory
 
 import numpy as np
-from skimage.morphology import disk, erosion
+from skimage.morphology import disk, dilation
 
 from tf_transformations import euler_from_quaternion
 
@@ -92,7 +92,7 @@ class PathPlan(Node):
 
         _, _, self.yaw = euler_from_quaternion(q) # quaternion to yaw
 
-        x_t, y_t = self.map_origin[0], self.map_origin[1]
+        # x_t, y_t = self.map_origin[0], self.map_origin[1]
         # self.rotation_matrix = np.array([
         #     [np.cos(self.yaw), -np.sin(self.yaw), x_t],
         #     [np.sin(self.yaw), np.cos(self.yaw), y_t],
@@ -220,7 +220,10 @@ class PathPlan(Node):
 
         footprint = disk(r_px)
 
-        dilated_map = erosion(self.map_data, footprint) # extends unknown boundary
+        modified_map = np.zeros_like(self.map_data, dtype = np.int8)
+        modified_map[self.map_data != 0] = 1
+
+        dilated_map = dilation(modified_map, footprint) # extends unknown boundary
 
         scaled_map = np.zeros_like(dilated_map, dtype = np.int8) # scale weights
         scaled_map[dilated_map != 0] = 100
