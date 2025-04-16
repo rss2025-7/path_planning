@@ -4,7 +4,7 @@ import numpy as np
 from scipy.spatial import KDTree
 import random
 import math
-# import dubins
+import dubins
 
 assert rclpy
 from geometry_msgs.msg import PoseWithCovarianceStamped, PoseStamped, PoseArray
@@ -73,7 +73,7 @@ class PathPlan(Node):
         self.map_resolution = None
         self.map_origin = (0.0, 0.0)
 
-        self.num_samples = 200 #1000 -> 500 -> 300 ->100 // 100 is unstable, 300 is stable
+        self.num_samples = 500 #1000 -> 500 -> 300 ->100 // 100 is unstable, 300 is stable
         self.k_neighbors = 10
         self.max_edge_length = 10000.0 # 100
 
@@ -85,7 +85,7 @@ class PathPlan(Node):
         self.map_rotation_inv = np.eye(2)
 
         self.robot_radius_m = 0.25
-        self.turning_radius = 1.0
+        self.turning_radius = 0.3
 
     def map_cb(self, msg):
         self.map_data = np.array(msg.data, dtype=np.int8).reshape(msg.info.height, msg.info.width)
@@ -201,8 +201,8 @@ class PathPlan(Node):
         """Build the PRM roadmap"""
         # Sample random points
         while len(self.nodes) < self.num_samples:
-            point = self.sample_random_point()
-            self.get_logger().info(f"Sampled point: {len(self.nodes)}")
+            point = (random.uniform(-60.0, 10.0), random.uniform(-10.5, 40.5)) #-61.5, 25.9, -17.0, 48.5
+            #self.get_logger().info(f"Sampled point: {len(self.nodes)}")
             if self.is_collision_free(point):
                 self.nodes.append(point)
         
@@ -266,7 +266,7 @@ class PathPlan(Node):
         if u < 0 or u >= self.map_width or v < 0 or v >= self.map_height:
             return False
             
-        # Check if point is in free space (0) or unknown (-1)
+        # Check if the point is in free space (0) or unknown (-1)
         return self.map_data[v, u] == 0
 
     def is_path_collision_free(self, p1, p2, step_size=0.1):
@@ -281,14 +281,16 @@ class PathPlan(Node):
                 return False
         return True
     
-    # def dubins_is_path_collision_free(self, p1, p2):
-    #     path = dubins.shortest_path(p1, p2, self.turning_radius)
-    #     configurations, _ = path.sample_many(0.1)
+    def dubins_is_path_collision_free(self, p1, p2):
+        p1 = (p1[0], p1[1], 0)
+        p2 = (p2[0], p2[1], 0)
+        path = dubins.shortest_path(p1, p2, self.turning_radius)
+        configurations, _ = path.sample_many(0.1)
 
-    #     for (x, y, theta) in configurations:
-    #         if not self.is_collision_free((x, y)):
-    #             return False
-    #     return True
+        for (x, y, theta) in configurations:
+            if not self.is_collision_free((x, y)):
+                return False
+        return True
 
     def sample_random_point(self): # TODO: Can be optimized //using world_coordinates
         """Sample a random point in the map"""
@@ -343,6 +345,7 @@ class PathPlan(Node):
         u = int(round(u_f))
         v = int(round(v_f))
         return (u, v)
+
 
 
 def main(args=None):
