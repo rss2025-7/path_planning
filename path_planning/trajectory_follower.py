@@ -77,6 +77,8 @@ class PurePursuit(Node):
             t1 = (-b + sqrt_disc) / (2 * a)
             t2 = (-b - sqrt_disc) / 2 * a
 
+            self.get_logger().info(f"{t1} {t2}")
+
             # If neither of these is between 0 and 1, then the line segment misses the circle, or hits if extended
             if not (0 <= t1 <= 1 or 0 <= t2 <= 1):
                 return None
@@ -95,7 +97,7 @@ class PurePursuit(Node):
             robot_y = robot_position.y
             robot_yaw = tf_transformations.euler_from_quaternion([robot_orientation.x, robot_orientation.y,
                                                                 robot_orientation.z, robot_orientation.w])[2]
-        
+
             # Compute closest point on each segment
             curr_pt = np.array([robot_x, robot_y]).reshape(2,1)
             traj_points = np.array(self.trajectory.points).T
@@ -103,7 +105,7 @@ class PurePursuit(Node):
             P2 = traj_points[:, 1:]
 
             d = P2 - P1
-            norms = np.sum(d**2, axis=0) 
+            norms = np.sum(d**2, axis=0)
             pt_to_traj = curr_pt - P1
             w_dot_v = np.sum(pt_to_traj * d, axis=0) / norms
             projection = np.clip(w_dot_v, 0.0, 1.0)
@@ -119,14 +121,15 @@ class PurePursuit(Node):
 
             # From that segment onwards, check for circle-line intersections (vectorize with np.roots)
             robot_lookahead_point = None
-            for i in range(closest_segment, len(P1)):
+            for i in range(closest_segment, P1.shape[1]):
                 robot_lookahead_point = self.find_point_along_trajectory(curr_pt.flatten(), self.lookahead, P1[:, i].flatten(), P2[:, i].flatten())
                 if robot_lookahead_point is None:
                     self.get_logger().info(f"Not found {i}")
                     continue
-                point_to_follow = robot_lookahead_point[0], robot_lookahead_point[1]
-                self.ptf_pub.publish(self.create_point_marker(point_to_follow, "/map"))
-                break
+                else:
+                    point_to_follow = robot_lookahead_point[0], robot_lookahead_point[1]
+                    self.ptf_pub.publish(self.create_point_marker(point_to_follow, "/map"))
+                    break
 
             # transforming from global frame to robot frame
             # self.get_logger().info(f"{robot_yaw, type(robot_yaw), type(robot_lookahead_point[0]), robot_lookahead_point[0], type(robot_x), robot_x}")
