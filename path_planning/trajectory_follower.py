@@ -45,6 +45,8 @@ class PurePursuit(Node):
                                              "ptf",
                                              1)
 
+        self.traj_beginning = 0
+
         drive_msg = AckermannDriveStamped()
         drive_msg.drive.speed = 0.0
         drive_msg.drive.steering_angle = 0.0
@@ -101,8 +103,8 @@ class PurePursuit(Node):
             # Compute closest point on each segment
             curr_pt = np.array([robot_x, robot_y]).reshape(2,1)
             traj_points = np.array(self.trajectory.points).T
-            P1 = traj_points[:, :-1]
-            P2 = traj_points[:, 1:]
+            P1 = traj_points[:, self.traj_beginning:-1]
+            P2 = traj_points[:, self.traj_beginning+1:]
 
             d = P2 - P1
             norms = np.sum(d**2, axis=0)
@@ -127,6 +129,7 @@ class PurePursuit(Node):
                     self.get_logger().info(f"Not found {i}")
                     continue
                 else:
+                    self.traj_beginning = i
                     point_to_follow = robot_lookahead_point[0], robot_lookahead_point[1]
                     self.ptf_pub.publish(self.create_point_marker(point_to_follow, "/map"))
                     break

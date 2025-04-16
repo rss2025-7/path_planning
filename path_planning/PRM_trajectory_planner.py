@@ -12,7 +12,7 @@ from nav_msgs.msg import OccupancyGrid
 from visualization_msgs.msg import Marker
 from .utils import LineTrajectory
 
-from skimage.morphology import disk, dilation 
+from skimage.morphology import disk, dilation
 
 
 # TODO: Add dubins path planner
@@ -73,7 +73,7 @@ class PathPlan(Node):
         self.map_resolution = None
         self.map_origin = (0.0, 0.0)
 
-        self.num_samples = 500 #1000 -> 500 -> 300 ->100 // 100 is unstable, 300 is stable
+        self.num_samples = 1000 #1000 -> 500 -> 300 ->100 // 100 is unstable, 300 is stable
         self.k_neighbors = 10
         self.max_edge_length = 10000.0 # 100
 
@@ -84,7 +84,7 @@ class PathPlan(Node):
         self.map_rotation = np.eye(2)
         self.map_rotation_inv = np.eye(2)
 
-        self.robot_radius_m = 0.25
+        self.robot_radius_m = 0.3
         self.turning_radius = 0.3
 
     def map_cb(self, msg):
@@ -142,7 +142,7 @@ class PathPlan(Node):
     def goal_cb(self, msg):
         self.goal_pose = (msg.pose.position.x, msg.pose.position.y)
         self.get_logger().info("Goal pose received")
-        
+
         # Create and publish marker for goal visualization
         marker = Marker()
         marker.header.frame_id = msg.header.frame_id
@@ -165,7 +165,7 @@ class PathPlan(Node):
         marker.color.a = 1.0
 
         marker.lifetime.sec = 0
-        
+
         self.goal_pub.publish(marker)
 
     def plan_path(self, start_point, end_point, map):
@@ -185,7 +185,7 @@ class PathPlan(Node):
 
         # Find path using A* algorithm
         path = self.a_star(0, 1)  # 0 is start, 1 is goal
-        
+
         if path:
             for point in path:
                 self.trajectory.addPoint(point)
@@ -205,7 +205,7 @@ class PathPlan(Node):
             #self.get_logger().info(f"Sampled point: {len(self.nodes)}")
             if self.is_collision_free(point):
                 self.nodes.append(point)
-        
+
         self.get_logger().info(f"Nodes: {len(self.nodes)}")
         # Build KD-tree for efficient nearest neighbor search
         self.kdtree = KDTree(self.nodes)
@@ -214,15 +214,15 @@ class PathPlan(Node):
         for i, node in enumerate(self.nodes):
             self.edges[i] = []
             distances, indices = self.kdtree.query(node, k=self.k_neighbors + 1)
-            
+
             for j, idx in enumerate(indices[1:]):  # Skip the first one (self)
-                if (self.is_path_collision_free(node, self.nodes[idx]) and 
-                    distances[j] <= self.max_edge_length):
-                    self.edges[i].append(idx)
-                # if (self.dubins_is_path_collision_free(node, self.nodes[idx]) and 
+                # if (self.is_path_collision_free(node, self.nodes[idx]) and
                 #     distances[j] <= self.max_edge_length):
                 #     self.edges[i].append(idx)
-        
+                if (self.dubins_is_path_collision_free(node, self.nodes[idx]) and
+                    distances[j] <= self.max_edge_length):
+                    self.edges[i].append(idx)
+
         self.get_logger().info(f"Edges: {len(self.edges[0])}")
 
     def a_star(self, start_idx, goal_idx):
@@ -232,25 +232,25 @@ class PathPlan(Node):
         came_from = {}
         g_score = {start_idx: 0}
         f_score = {start_idx: self.heuristic(start_idx, goal_idx)}
-        
+
         while open_set:
             current = min(open_set, key=lambda x: f_score.get(x, float('inf')))
-            
+
             if current == goal_idx:
                 return self.reconstruct_path(came_from, current)
-            
+
             open_set.remove(current)
-            
+
             for neighbor in self.edges.get(current, []):
                 tentative_g_score = g_score[current] + self.distance(current, neighbor)
-                
+
                 if tentative_g_score < g_score.get(neighbor, float('inf')):
                     came_from[neighbor] = current
                     g_score[neighbor] = tentative_g_score
                     f_score[neighbor] = tentative_g_score + self.heuristic(neighbor, goal_idx)
                     if neighbor not in open_set:
                         open_set.add(neighbor)
-        
+
         return None
 
     def is_collision_free(self, point):
@@ -258,14 +258,14 @@ class PathPlan(Node):
         x, y = point
         # Convert to map coordinates
         u, v = self.world_to_map(x, y)
-        
+
         # Check bounds
         # if map_x < 0 or map_x >= self.map_width or map_y < 0 or map_y >= self.map_height:
         #     return False
 
         if u < 0 or u >= self.map_width or v < 0 or v >= self.map_height:
             return False
-            
+
         # Check if the point is in free space (0) or unknown (-1)
         return self.map_data[v, u] == 0
 
@@ -273,14 +273,14 @@ class PathPlan(Node):
         """Check if the path between two points is collision-free"""
         dist = np.linalg.norm(np.array(p2) - np.array(p1))
         steps = int(dist / step_size) + 1
-        
+
         for i in range(steps + 1):
             t = i / steps
             point = (1 - t) * np.array(p1) + t * np.array(p2)
             if not self.is_collision_free(point):
                 return False
         return True
-    
+
     def dubins_is_path_collision_free(self, p1, p2):
         p1 = (p1[0], p1[1], 0)
         p2 = (p2[0], p2[1], 0)
@@ -294,14 +294,14 @@ class PathPlan(Node):
 
     def sample_random_point(self): # TODO: Can be optimized //using world_coordinates
         """Sample a random point in the map"""
-        # x = random.uniform(self.map_origin[0], 
+        # x = random.uniform(self.map_origin[0],
         #                  self.map_origin[0] + self.map_width * self.map_resolution)
-        # y = random.uniform(self.map_origin[1], 
+        # y = random.uniform(self.map_origin[1],
         #                  self.map_origin[1] + self.map_height * self.map_resolution)
         x = random.uniform(-61.5, 25.9)
         y = random.uniform(-17.0, 48.5)
         return (x, y)
-    
+
     def heuristic(self, a, b):
         """Euclidean distance heuristic"""
         return np.linalg.norm(np.array(self.nodes[a]) - np.array(self.nodes[b]))
@@ -317,7 +317,7 @@ class PathPlan(Node):
             current = came_from[current]
             path.append(self.nodes[current])
         return list(reversed(path))
-    
+
     def quaternion_to_yaw(self, qx, qy, qz, qw):
         """
         Convert a quaternion into a yaw angle (around Z-axis).
@@ -327,7 +327,7 @@ class PathPlan(Node):
         siny_cosp = 2.0 * (qw*qz + qx*qy)
         cosy_cosp = 1.0 - 2.0 * (qy*qy + qz*qz)
         return math.atan2(siny_cosp, cosy_cosp)
-    
+
     def world_to_map(self, x, y):
         """
         Convert world coordinates (x, y) into map pixel indices (u, v),
