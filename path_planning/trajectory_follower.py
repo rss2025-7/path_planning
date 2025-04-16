@@ -92,12 +92,13 @@ class PurePursuit(Node):
             robot_x = robot_position.x
             robot_y = robot_position.y
             robot_yaw = tf_transformations.euler_from_quaternion([robot_orientation.x, robot_orientation.y,
-                                                                robot_orientation.z, robot_orientation.w])
+                                                                robot_orientation.z, robot_orientation.w])[2]
         
             # Compute closest point on each segment
-            curr_pt = np.array([odometry_msg.poses.point.x, odometry_msg.poses.point.y]).reshape(2,1)
-            P1 = self.trajectory.points[:, 1:]
-            P2 = self.trajectory.points[:, :-1]
+            curr_pt = np.array([robot_x, robot_y]).reshape(2,1)
+            traj_points = np.array(self.trajectory.points).T
+            P1 = traj_points[:, 1:]
+            P2 = traj_points[:, :-1]
 
             d = P2 - P1
             norms = np.sum(d**2, axis=0) 
@@ -112,17 +113,23 @@ class PurePursuit(Node):
             # Find segment with closest point
             closest_segment = np.argmin(distances)
 
+            self.get_logger().info(f"{closest_segment}")
+
             # From that segment onwards, check for circle-line intersections (vectorize with np.roots)
             robot_lookahead_point = None
             for i in range(closest_segment, len(P1)):
-                robot_lookahead_point = self.find_point_along_trajectory(curr_pt.flatten(), self.lookahead, P1[i, :].flatten(), P2[i, :].flatten())
-                if robot_lookahead_point is not None:
-                    break
+                robot_lookahead_point = self.find_point_along_trajectory(curr_pt.flatten(), self.lookahead, P1[:, i].flatten(), P2[:, i].flatten())
+                if robot_lookahead_point is None:
+                    self.get_logger().info(f"Not found")
+                    continue
+                point_to_follow = robot_lookahead_point[0], robot_lookahead_point[1]
+                self.ptf_pub.publish(self.create_point_marker(point_to_follow, "/map"))
+                break
 
             # transforming from global frame to robot frame
             # self.get_logger().info(f"{robot_yaw, type(robot_yaw), type(robot_lookahead_point[0]), robot_lookahead_point[0], type(robot_x), robot_x}")
-            rframe_lookahead_x = np.cos(-robot_yaw[0]) * (robot_lookahead_point[0] - robot_x) - np.sin(-robot_yaw[0]) * (robot_lookahead_point[1] - robot_y)
-            rframe_lookahead_y = np.sin(-robot_yaw[0]) * (robot_lookahead_point[0] - robot_x) + np.cos(-robot_yaw[0]) * (robot_lookahead_point[1] - robot_y)
+            rframe_lookahead_x = np.cos(-robot_yaw) * (robot_lookahead_point[0] - robot_x) - np.sin(-robot_yaw) * (robot_lookahead_point[1] - robot_y)
+            rframe_lookahead_y = np.sin(-robot_yaw) * (robot_lookahead_point[0] - robot_x) + np.cos(-robot_yaw) * (robot_lookahead_point[1] - robot_y)
 
             # pure pursuit algorithm
             curvature = (2 * rframe_lookahead_y) / (self.lookahead ** 2)
@@ -183,9 +190,9 @@ class PurePursuit(Node):
 
         self.initialized_traj = True
 
-    def create_point_marker(self, point):
+    def create_point_marker(self, point, frame):
         marker = Marker()
-        marker.header.frame_id = "map"
+        marker.header.frame_id = frame
         marker.header.stamp = self.get_clock().now().to_msg()
         marker.type = Marker.SPHERE
         marker.action = Marker.ADD
