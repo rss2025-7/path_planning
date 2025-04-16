@@ -6,6 +6,8 @@ from rclpy.node import Node
 import numpy as np
 import tf_transformations
 
+from visualization_msgs.msg import Marker
+
 from .utils import LineTrajectory
 
 
@@ -39,6 +41,10 @@ class PurePursuit(Node):
                                                self.drive_topic,
                                                1)
 
+        self.ptf_pub = self.create_publisher(Marker,
+                                             "ptf",
+                                             1)
+
         drive_msg = AckermannDriveStamped()
         drive_msg.drive.speed = 0.0
         drive_msg.drive.steering_angle = 0.0
@@ -54,7 +60,7 @@ class PurePursuit(Node):
             # x, y, yaw
             robot_x = robot_position.x
             robot_y = robot_position.y
-            robot_yaw = tf_transformations.euler_from_quaternion([robot_orientation.x, robot_orientation.y, 
+            robot_yaw = tf_transformations.euler_from_quaternion([robot_orientation.x, robot_orientation.y,
                                                                 robot_orientation.z, robot_orientation.w])
             # check if each point is at lookahead distance
             # self.get_logger().info(f"{self.trajectory.points}, {robot_x}, {robot_y}")
@@ -66,6 +72,7 @@ class PurePursuit(Node):
 
                 if robot_distance_to_point >= self.lookahead:
                     robot_lookahead_point = point
+                    self.ptf_pub.publish(self.create_point_marker(robot_lookahead_point))
                     break
 
             # self.get_logger().info(f"{robot_lookahead_point}")
@@ -94,6 +101,31 @@ class PurePursuit(Node):
 
         self.initialized_traj = True
 
+    def create_point_marker(self, point):
+        marker = Marker()
+        marker.header.frame_id = "map"
+        marker.header.stamp = self.get_clock().now().to_msg()
+        marker.type = Marker.SPHERE
+        marker.action = Marker.ADD
+
+        marker.pose.position.x = point[0]
+        marker.pose.position.y = point[1]
+        marker.pose.position.z = 0.0
+        marker.pose.orientation.x = 0.0
+        marker.pose.orientation.y = 0.0
+        marker.pose.orientation.z = 0.0
+        marker.pose.orientation.w = 1.0
+
+        marker.scale.x = 0.2
+        marker.scale.y = 0.2
+        marker.scale.z = 0.2
+
+        marker.color.r = 1.0
+        marker.color.g = 0.0
+        marker.color.b = 0.0
+        marker.color.a = 1.0
+
+        return marker
 
 def main(args=None):
     rclpy.init(args=args)
