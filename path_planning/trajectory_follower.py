@@ -23,9 +23,9 @@ class PurePursuit(Node):
         self.odom_topic = self.get_parameter('odom_topic').get_parameter_value().string_value
         self.drive_topic = self.get_parameter('drive_topic').get_parameter_value().string_value
 
-        self.lookahead = 1.0  # FILL IN #
-        self.speed = 1.0  # FILL IN #
-        self.wheelbase_length = 1.0  # FILL IN #
+        self.lookahead = 2.0  # FILL IN #
+        self.speed = 1.5  # FILL IN #
+        self.wheelbase_length = 0.34  # FILL IN #
 
         self.trajectory = LineTrajectory("/followed_trajectory")
 
@@ -48,7 +48,9 @@ class PurePursuit(Node):
         drive_msg = AckermannDriveStamped()
         drive_msg.drive.speed = 0.0
         drive_msg.drive.steering_angle = 0.0
+        self.stop = 0
         self.drive_pub.publish(drive_msg)
+
 
     def find_point_along_trajectory(self, r, la, p1, p2):
             """
@@ -60,7 +62,7 @@ class PurePursuit(Node):
             p1 = np.array(p1)
             p2 = np.array(p2)
 
-            self.get_logger().info(f"{p1}, {p2}")
+            # self.get_logger().info(f"{p1}, {p2}")
 
             V = p2 - p1
 
@@ -77,7 +79,7 @@ class PurePursuit(Node):
             t1 = (-b + sqrt_disc) / (2 * a)
             t2 = (-b - sqrt_disc) / 2 * a
 
-            self.get_logger().info(f"{t1} {t2}")
+            # self.get_logger().info(f"{t1} {t2}")
 
             # If neither of these is between 0 and 1, then the line segment misses the circle, or hits if extended
             if not (0 <= t1 <= 1 or 0 <= t2 <= 1):
@@ -90,60 +92,74 @@ class PurePursuit(Node):
         # deconstructing pose
         robot_position = odometry_msg.pose.pose.position
         robot_orientation = odometry_msg.pose.pose.orientation
-
+        # self.get_logger().info("ODOM")
         if self.trajectory.points:
+            drive_msg = AckermannDriveStamped()
+
             # x, y, yaw
             robot_x = robot_position.x
             robot_y = robot_position.y
-            robot_yaw = tf_transformations.euler_from_quaternion([robot_orientation.x, robot_orientation.y,
-                                                                robot_orientation.z, robot_orientation.w])[2]
 
-            # Compute closest point on each segment
-            curr_pt = np.array([robot_x, robot_y]).reshape(2,1)
-            traj_points = np.array(self.trajectory.points).T
-            P1 = traj_points[:, :-1]
-            P2 = traj_points[:, 1:]
+            if np.hypot(robot_x - self.goal[0], robot_y - self.goal[1]) <= 0.5:
+                drive_msg.drive.speed = 0.0
+                drive_msg.drive.steering_angle = 0.0
+                self.stop = True
 
-            d = P2 - P1
-            norms = np.sum(d**2, axis=0)
-            pt_to_traj = curr_pt - P1
-            w_dot_v = np.sum(pt_to_traj * d, axis=0) / norms
-            projection = np.clip(w_dot_v, 0.0, 1.0)
+            if not self.stop:
+                robot_yaw = tf_transformations.euler_from_quaternion([robot_orientation.x, robot_orientation.y,
+                                                                    robot_orientation.z, robot_orientation.w])[2]
 
-            closest_pt = P1 + projection * d
+                # Compute closest point on each segment
+                curr_pt = np.array([robot_x, robot_y]).reshape(2,1)
+                # self.get_logger().info(f"robot pose {curr_pt[0], curr_pt[1]}")
+                P1 = self.traj_points[:, :-1]
+                P2 = self.traj_points[:, 1:]
 
-            distances = np.sum((curr_pt - closest_pt) ** 2, axis=0)
+                d = P2 - P1
+                norms = np.sum(d**2, axis=0)
+                pt_to_traj = curr_pt - P1
+                w_dot_v = np.sum(pt_to_traj * d, axis=0) / norms
+                projection = np.clip(w_dot_v, 0.0, 1.0)
 
-            # Find segment with closest point
-            closest_segment = np.argmin(distances)
+                closest_pt = P1 + projection * d
 
-            self.get_logger().info(f"{closest_segment}")
+                distances = np.sum((curr_pt - closest_pt) ** 2, axis=0)
 
-            # From that segment onwards, check for circle-line intersections (vectorize with np.roots)
-            robot_lookahead_point = None
-            for i in range(closest_segment, P1.shape[1]):
-                robot_lookahead_point = self.find_point_along_trajectory(curr_pt.flatten(), self.lookahead, P1[:, i].flatten(), P2[:, i].flatten())
-                if robot_lookahead_point is None:
-                    self.get_logger().info(f"Not found {i}")
-                    continue
-                else:
-                    point_to_follow = robot_lookahead_point[0], robot_lookahead_point[1]
-                    self.ptf_pub.publish(self.create_point_marker(point_to_follow, "/map"))
-                    break
+                # self.get_logger().info(f"{distances[0]} {distances[103:107]}")
 
-            # transforming from global frame to robot frame
-            # self.get_logger().info(f"{robot_yaw, type(robot_yaw), type(robot_lookahead_point[0]), robot_lookahead_point[0], type(robot_x), robot_x}")
-            rframe_lookahead_x = np.cos(-robot_yaw) * (robot_lookahead_point[0] - robot_x) - np.sin(-robot_yaw) * (robot_lookahead_point[1] - robot_y)
-            rframe_lookahead_y = np.sin(-robot_yaw) * (robot_lookahead_point[0] - robot_x) + np.cos(-robot_yaw) * (robot_lookahead_point[1] - robot_y)
+                # Find segment with closest point
+                closest_segment = np.argmin(distances)
 
-            # pure pursuit algorithm
-            curvature = (2 * rframe_lookahead_y) / (self.lookahead ** 2)
-            steering_angle = np.arctan(self.wheelbase_length * curvature)
+                # self.get_logger().info(f"{closest_segment}")
 
-            # adjusting drive msg and publishing
-            drive_msg = AckermannDriveStamped()
-            drive_msg.drive.speed = self.speed
-            drive_msg.drive.steering_angle = steering_angle
+                # From that segment onwards, check for circle-line intersections (vectorize with np.roots)
+                robot_lookahead_point = None
+                for i in range(closest_segment, P1.shape[1]):
+                    robot_lookahead_point = self.find_point_along_trajectory(curr_pt.flatten(), self.lookahead, P1[:, i].flatten(), P2[:, i].flatten())
+                    if robot_lookahead_point is None:
+                        # self.get_logger().info(f"Not found {i}")
+                        point_to_follow = P1[:, i].flatten()
+                        continue
+                    else:
+                        point_to_follow = robot_lookahead_point[0], robot_lookahead_point[1]
+                        self.ptf_pub.publish(self.create_point_marker(point_to_follow, "/map"))
+                        break
+                try:
+                    # transforming from global frame to robot frame
+                    # self.get_logger().info(f"{robot_yaw, type(robot_yaw), type(robot_lookahead_point[0]), robot_lookahead_point[0], type(robot_x), robot_x}")
+                    rframe_lookahead_x = np.cos(-robot_yaw) * (robot_lookahead_point[0] - robot_x) - np.sin(-robot_yaw) * (robot_lookahead_point[1] - robot_y)
+                    rframe_lookahead_y = np.sin(-robot_yaw) * (robot_lookahead_point[0] - robot_x) + np.cos(-robot_yaw) * (robot_lookahead_point[1] - robot_y)
+
+                    # pure pursuit algorithm
+                    curvature = (2 * rframe_lookahead_y) / (self.lookahead ** 2)
+                    steering_angle = np.arctan(self.wheelbase_length * curvature)
+
+                    # adjusting drive msg and publishing
+
+                    drive_msg.drive.speed = self.speed
+                    drive_msg.drive.steering_angle = steering_angle
+                except:
+                    return
             self.drive_pub.publish(drive_msg)
 
         # # deconstructing pose
@@ -192,6 +208,9 @@ class PurePursuit(Node):
         self.trajectory.clear()
         self.trajectory.fromPoseArray(msg)
         self.trajectory.publish_viz(duration=0.0)
+        traj_points = np.array(self.trajectory.points)
+        self.goal = traj_points[-1]
+        self.traj_points = traj_points.T
 
         self.initialized_traj = True
 
