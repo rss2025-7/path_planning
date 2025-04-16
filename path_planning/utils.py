@@ -145,9 +145,9 @@ class LineTrajectory:
                 marker.pose.position.x = self.points[0][0]
                 marker.pose.position.y = self.points[0][1]
                 marker.pose.orientation.w = 1.0
-                marker.scale.x = 1.0
-                marker.scale.y = 1.0
-                marker.scale.z = 1.0
+                marker.scale.x = 0.3
+                marker.scale.y = 0.3
+                marker.scale.z = 0.3
                 marker.color.r = 0.0
                 marker.color.g = 1.0
                 marker.color.b = 0.0
@@ -174,9 +174,9 @@ class LineTrajectory:
                 marker.pose.position.x = self.points[-1][0]
                 marker.pose.position.y = self.points[-1][1]
                 marker.pose.orientation.w = 1.0
-                marker.scale.x = 1.0
-                marker.scale.y = 1.0
-                marker.scale.z = 1.0
+                marker.scale.x = 0.3
+                marker.scale.y = 0.3
+                marker.scale.z = 0.3
                 marker.color.r = 1.0
                 marker.color.g = 0.0
                 marker.color.b = 0.0
