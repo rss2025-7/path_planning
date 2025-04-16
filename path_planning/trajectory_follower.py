@@ -60,6 +60,8 @@ class PurePursuit(Node):
             p1 = np.array(p1)
             p2 = np.array(p2)
 
+            self.get_logger().info(f"{p1}, {p2}")
+
             V = p2 - p1
 
             a = V.dot(V)
@@ -97,8 +99,8 @@ class PurePursuit(Node):
             # Compute closest point on each segment
             curr_pt = np.array([robot_x, robot_y]).reshape(2,1)
             traj_points = np.array(self.trajectory.points).T
-            P1 = traj_points[:, 1:]
-            P2 = traj_points[:, :-1]
+            P1 = traj_points[:, :-1]
+            P2 = traj_points[:, 1:]
 
             d = P2 - P1
             norms = np.sum(d**2, axis=0) 
@@ -120,7 +122,7 @@ class PurePursuit(Node):
             for i in range(closest_segment, len(P1)):
                 robot_lookahead_point = self.find_point_along_trajectory(curr_pt.flatten(), self.lookahead, P1[:, i].flatten(), P2[:, i].flatten())
                 if robot_lookahead_point is None:
-                    self.get_logger().info(f"Not found")
+                    self.get_logger().info(f"Not found {i}")
                     continue
                 point_to_follow = robot_lookahead_point[0], robot_lookahead_point[1]
                 self.ptf_pub.publish(self.create_point_marker(point_to_follow, "/map"))
