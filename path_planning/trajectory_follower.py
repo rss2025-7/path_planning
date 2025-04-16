@@ -45,6 +45,8 @@ class PurePursuit(Node):
                                              "ptf",
                                              1)
 
+        self.traj_beginning = 0
+
         drive_msg = AckermannDriveStamped()
         drive_msg.drive.speed = 0.0
         drive_msg.drive.steering_angle = 0.0
