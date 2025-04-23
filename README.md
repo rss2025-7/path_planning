@@ -1,9 +1,9 @@
 | Deliverable                                                            | Due Date                             |
 |------------------------------------------------------------------------|--------------------------------------|
 | Briefing (8 min presentation + 3 min Q&A) (slides due on github pages) | Wednesday, April 16th at 1:00 PM EST |
-| Report (on github pages)                                               | Friday, April 18th at 11:59PM EST    |
-| Pushed code to Git                                                     | Friday, April 18th at 11:59PM EST    |
-| [Team Member Assessment](https://forms.gle/QMLaatrydFqXdXYF8)                            | Friday, April 18th at 11:59PM EST |
+| Report (on github pages)                                               | Wednesday, April 23rd at 11:59PM EST    |
+| Pushed code to Git                                                     | Wednesday, April 23rd at 11:59PM EST    |
+| [Team Member Assessment](https://forms.gle/pAyk6ELdLiHY7Mdw9)                            | Wednesday, April 23rd at 11:59PM EST |
 
 # Lab 6: Path Planning
 
@@ -72,7 +72,7 @@ This section details the grading scheme for Lab 6.
 | report grade (out of 10)   | 40%       |
 
 ### TA Checkoff
-Before your briefing deadline, you should seek out a TA to check off your solution during lab hours or office hours. We want to see a working solution for both your trajectory planner and trajectory follower in simulation. At least one member of your team needs to be present for the checkoff and be ready to answer questions about your implementation.
+Before your briefing deadline, you should seek out a TA to check off your solution during lab hours or office hours. We want to see a working solution for both your trajectory planner and trajectory follower in simulation. Ideally all of your team needs to be present for the checkoff and be ready to answer questions about your implementation.
 
 ### Briefing Evaluation (see [technical briefing rubric](https://canvas.mit.edu/courses/31106/assignments/385220) for grading details)
 
@@ -198,7 +198,7 @@ dimensions of your configuration space.
 
 The tips and tricks section include pointers on how to discretize your search space, including alternatives to the regular grid.  
 
-[This source](https://www.redblobgames.com/pathfinding/a-star/introduction.html) includes a friendly introduction and
+[This source](https://www.redblobgames.com/pathfinding/a-star/introduction.html) includes a friendly introduction andatl
 comparison between A*, Djikstra’s, and BFS.
 
 ### Sampling-based Planning
@@ -282,8 +282,7 @@ Provided basement map (left) and eroded map (right). Disk element, 10px radius.
 To avoid all of these potentially very bad collisions, one method is to “dilate” the obstacles so that nearby states are
 considered off-limits to the planning algorithm even though they technically are collision-free. You may choose to check
 out these possible
-functions: [disks](http://scikit-image.org/docs/dev/api/skimage.morphology.html?highlight=disk#disk), [dilations](http://scikit-image.org/docs/dev/api/skimage.morphology.html?highlight=dilation#dilation),
-and [erosions](https://scikit-image.org/docs/dev/api/skimage.morphology.html?highlight=erosion#skimage.morphology.erosion).
+functions: [dilations and erosions](https://docs.opencv.org/3.4/db/df6/tutorial_erosion_dilatation.html).
 You can do these processes offline and just use the adjusted map for your planning algorithms.
 
 #### Motion Heuristics
